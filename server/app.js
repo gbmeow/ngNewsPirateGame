@@ -40,18 +40,22 @@ var io = require('socket.io').listen(server);
 var players = [];
 io.sockets.on('connection', function (socket) {
   socket.on('player:joined', function(player){
+    player.x = 0;
+    player.y = 0;
     players.push(player);
-    io.emit('player:joined', players);
+    io.emit('player:newPlayer', players);
   });
 
   socket.on('player:updatePosition', function(player){
     var foundUser = findUser(players, player);
-    console.log(players[foundUser].x !== player.x);
-    if (foundUser) {
-      players[foundUser].x = player.x;
-      players[foundUser].y = player.y;
+    console.log('before', players[foundUser].x);
+    console.log(player.x);
+    if (foundUser >= 0) {
+      players[foundUser].x += player.x;
+      players[foundUser].y += player.y;
+      console.log('after', players[foundUser].x);
+      io.emit('player:updatePosition', players, players[foundUser]);
     }
-    io.emit('player:updatePosition', players);
   });
 
 });
@@ -60,7 +64,6 @@ function findUser(array, player) {
   var found = 0;
   for (var i = 0; i < array.length; i++) {
     if (array[i].id === player.id) {
-      console.log(array[i], player);
       found = i;
     }
   }

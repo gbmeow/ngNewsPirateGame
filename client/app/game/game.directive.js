@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pirateGameApp')
-  .directive('game', function () {
+  .directive('game', function (playerModel) {
     return {
       templateUrl: 'app/game/game.html',
       restrict: 'EA',
@@ -9,15 +9,8 @@ angular.module('pirateGameApp')
 
         var ourStar;
         var socket = io();
-        var rando = getRandomInt();
+        var uniqueId = getRandomInt();
         var onScreen = [];
-
-        var player = {
-          id: rando,
-          name: 'George' + rando,
-          x: 0,
-          y: 0
-        };
 
         var vectors = {
           'left': { x: -10, y: 0 },
@@ -40,86 +33,75 @@ angular.module('pirateGameApp')
         }
 
         function create() {
-          ourStar = game.add.sprite(10, 0, 'dude');
+          var temp = new playerModel(uniqueId, addSprite());
+          onScreen.push({id: temp.id, sprite: temp});
         }
 
-        socket.emit('player:joined', player);
+        socket.emit('player:joined', {id: uniqueId});
+        //setup ends ...
 
-        socket.on('player:joined', function(player){
-          onScreen.push({id: player.id, sprite: addSprite(player)});
 
-          //var notOnScreen = addPlayersNotOnScreenYet(allPlayers);
-          //if (notOnScreen.length > 0) {
-          //  _.forEach(notOnScreen, function(item) {
-          //    onScreen.push({id: item.id, sprite: addSprite(item)});
-          //  })
-          //}
-        });
-
-        socket.on('player:updatePosition', function(allPlayers, play){
+        socket.on('player:newPlayer', function(allPlayers){
+          //1. our own player can get added twice
           var _allPlayers = allPlayers;
-          onScreen[0].sprite.x += 20;
-          onScreen[0].sprite.y += 20;
-
-
-
-            //_.forEach(_allPlayers, function(item) {
-            //  if (item.id === player.id) {
-            //    updatePositionLocalUser(player);
-            //  }
-            //  _.forEach(onScreen, function(screen, key) {
-            //    if (item.id === screen.id) {
-            //      onScreen[key].x = item.x;
-            //      onScreen[key].y = item.y;
-            //    }
-            //  })
-            //})
+          _.forEach(_allPlayers, function(obj) {
+            if (!isOnScreen(obj.id)) {
+              var temp = new playerModel(obj.id, addSprite());
+              onScreen.push({id: temp.id, sprite: temp});
+            }
+          })
         });
 
-        function addPlayersNotOnScreenYet(players) {
-          var _players = players;
-          _.forEach(onScreen, function(screen) {
-            _.forEach(_players, function(player, key) {
-                if (player.id === screen.id && player.id !== rando) {
-                  _players.splice(key, 1);
-                }
-            })
+        function isOnScreen(id) {
+          var _id = id;
+          var result = false;
+          _.forEach(onScreen, function(item) {
+            if (item.id === _id) {
+              result = true;
+            }
           });
-          return _players;
-
+          return result;
         }
+
+        function findCurrentIndex(array, id) {
+          return _.findIndex(array, 'id', id);
+        }
+
+        socket.on('player:updatePosition', function(allPlayers, updatedPlayer){
+          var _allPlayers = allPlayers;
+          var updated = onScreen[findCurrentIndex(onScreen, updatedPlayer.id)];
+          updated.sprite.updatePosition(updatedPlayer.x, updatedPlayer.y);
+          
+          //console.log(updatedPlayer, updatedPlayer.x, updatedPlayer.y);
+          //_.forEach(onScreen, function(item) {
+          //  var newValues = _allPlayers[findCurrentIndex(_allPlayers, item.id)];
+          //  console.log(newValues.x, newValues.y);
+          //  if (newValues) {
+          //    item.sprite.updatePosition(newValues.x, newValues.y);
+          //  }
+          //})
+        });
+
 
 
         scope.move = function(key) {
-          //1. Move your guy
-          //2. Broadcast to server - you moved
-          movePositionLocalUser(key);
-          broadcastPositionChange();
-          game.update();
+          var index = findCurrentIndex(onScreen, uniqueId);
+          if (index >= 0) {
+            updatePosition(key, index);
+          }
         }
 
+        function updatePosition(key, index) {
+          var update = {id: uniqueId, x: vectors[key].x, y: vectors[key].y};
+          onScreen[index].sprite.updatePosition(update.x, update.y);
+          console.log(update.x);
+          broadcastPositionChange(update);
+          game.update(); //???
+        }
 
-        function broadcastPositionChange() {
+        function broadcastPositionChange(player) {
           socket.emit('player:updatePosition', player);
         }
-
-        function movePositionLocalUser(key) {
-          ourStar.x += vectors[key].x;
-          ourStar.y += vectors[key].y;
-          updateObj(ourStar);
-        }
-
-        function updatePositionLocalUser(obj) {
-          ourStar.x = obj.x;
-          ourStar.y = obj.y;
-          updateObj(ourStar);
-        }
-
-        function updateObj(obj) {
-          player.x = obj.x;
-          player.y = obj.y;
-        }
-
 
         function getRandomInt() {
           var min = 1;
@@ -127,11 +109,11 @@ angular.module('pirateGameApp')
           return Math.floor(Math.random() * (max - min)) + min;
         }
 
-        function addSprite(obj) {
-          return game.add.sprite(obj.x, obj.y, 'dude');
+        function addSprite() {
+          return game.add.sprite(10, getRandomInt(), 'dude');
         }
 
-        
+
 
       }
     };
