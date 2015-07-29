@@ -7,7 +7,6 @@ angular.module('pirateGameApp')
       restrict: 'EA',
       link: function (scope, element, attrs) {
 
-        var ourStar;
         var socket = io();
         var uniqueId = getRandomInt();
         var onScreen = [];
@@ -28,7 +27,6 @@ angular.module('pirateGameApp')
           );
 
         function preload() {
-          //game.load.image('dude', 'star.png');
           game.load.image('dude', '../assets/images/yeoman.png');
         }
 
@@ -36,6 +34,8 @@ angular.module('pirateGameApp')
           var temp = new playerModel(uniqueId, addSprite());
           onScreen.push({id: temp.id, sprite: temp});
         }
+
+        console.log(uniqueId);
 
         socket.emit('player:joined', {id: uniqueId});
         //setup ends ...
@@ -64,42 +64,54 @@ angular.module('pirateGameApp')
         }
 
         function findCurrentIndex(array, id) {
-          return _.findIndex(array, 'id', id);
+          var result = _(array)
+            .map(function(el, index) { if (el.id === id) {return index;}})
+            .filter(function(el) {return el !== undefined;})
+            .value();
+          return result[0];
         }
 
         socket.on('player:updatePosition', function(allPlayers, updatedPlayer){
           var _allPlayers = allPlayers;
           var updated = onScreen[findCurrentIndex(onScreen, updatedPlayer.id)];
           updated.sprite.updatePosition(updatedPlayer.x, updatedPlayer.y);
-          
-          //console.log(updatedPlayer, updatedPlayer.x, updatedPlayer.y);
-          //_.forEach(onScreen, function(item) {
-          //  var newValues = _allPlayers[findCurrentIndex(_allPlayers, item.id)];
-          //  console.log(newValues.x, newValues.y);
-          //  if (newValues) {
-          //    item.sprite.updatePosition(newValues.x, newValues.y);
-          //  }
-          //})
         });
+
+        //State on one side --
+          //data living in once place
+          //pre-
+        //TODO Understand State
+        //GOAL: Effcient of updating players
+
 
 
 
         scope.move = function(key) {
           var index = findCurrentIndex(onScreen, uniqueId);
+
           if (index >= 0) {
             updatePosition(key, index);
           }
         }
 
         function updatePosition(key, index) {
+          //Check if we can move
           var update = {id: uniqueId, x: vectors[key].x, y: vectors[key].y};
           onScreen[index].sprite.updatePosition(update.x, update.y);
-          console.log(update.x);
           broadcastPositionChange(update);
           game.update(); //???
         }
 
+
+
+        socket.on('rejected', function(newCoordinates) {
+
+        })
+
+
+
         function broadcastPositionChange(player) {
+          console.log(player.id === uniqueId, player.id);
           socket.emit('player:updatePosition', player);
         }
 
